@@ -1,0 +1,61 @@
+set todoList to {}
+set todoText to paragraphs of (read POSIX file <file path>)
+repeat with nextLine in todoText
+	if length of nextLine is greater than 0 then
+		copy nextLine to the end of todoList
+	end if
+end repeat
+
+local theProjectPath
+local theIssueNote
+local projNames
+set theDate to current date
+set theRepoServer to item 1 of todoList
+set theProjectTitle to item 2 of todoList
+set theTaskTitle to item 3 of todoList
+set theIssueType to item 4 of todoList
+set theIssueDescription to item 5 of todoList
+
+if ((theRepoServer as string) is equal to "BitBucket") then
+	set theIssuePriority to item 6 of todoList
+	set theIssueNote to theIssuePriority & return & theIssueDescription
+else if ((theRepoServer as string) is equal to "GitHub") then
+	set theIssueNote to theProjectTitle & return & theIssueDescription
+end if
+
+tell application "OmniFocus"
+	set oDoc to default document
+	set nofolder_Projects to (name of (flattened projects of oDoc where its folder is missing value and its status is active))
+	set folder_Projects to (name of (flattened projects of oDoc where hidden of its folder is false and its status is active))
+	set projNames to nofolder_Projects & folder_Projects
+end tell
+
+repeat with aProject in projNames
+	log (aProject as string) & " " & theProjectTitle
+	if ((theProjectTitle as string) is equal to (aProject as string)) then
+		set theProjectPath to aProject
+		exit repeat
+	end if
+end repeat
+
+try
+	my titledProject(theProjectPath, (theIssueType & " - " & theTaskTitle), theIssueNote)
+on error
+	my inboxProject((theProjectTitle & return & theIssueType & " - " & theTaskTitle), theIssueNote)
+end try
+
+
+on titledProject(projectPath, taskName, taskNotes)
+	tell application "OmniFocus"
+		tell default document
+			set theProject to first flattened project where its name = (projectPath as string)
+			tell theProject to make new task with properties {name:taskName, note:taskNotes}
+		end tell
+	end tell
+end titledProject
+
+on inboxProject(taskName, taskNotes)
+	tell front document of application "OmniFocus"
+		make new inbox task with properties {name:taskName, note:taskNotes}
+	end tell
+end inboxProject
